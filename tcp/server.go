@@ -30,6 +30,7 @@ func ListenAndServeWithSignal(cfg *Config, handler tcp.Handler) error {
 	sigCh := make(chan os.Signal)
 	signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
 	go func() {
+		// wait for signal and add to closeChan
 		sig := <-sigCh
 		switch sig {
 		case syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
@@ -48,7 +49,9 @@ func ListenAndServeWithSignal(cfg *Config, handler tcp.Handler) error {
 // ListenAndServe binds port and handle requests, blocking until close
 func ListenAndServe(listener net.Listener, handler tcp.Handler, closeChan <-chan struct{}) {
 	// listen signal
+	// handle signal
 	go func() {
+		// wait for signal, then close listener and handler
 		<-closeChan
 		logger.Info("shutting down...")
 		_ = listener.Close() // listener.Accept() will return err immediately
@@ -63,6 +66,7 @@ func ListenAndServe(listener net.Listener, handler tcp.Handler, closeChan <-chan
 	}()
 	ctx := context.Background()
 	var waitDone sync.WaitGroup
+	// add max connect
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -73,10 +77,12 @@ func ListenAndServe(listener net.Listener, handler tcp.Handler, closeChan <-chan
 		waitDone.Add(1)
 		go func() {
 			defer func() {
+				// close connection
 				waitDone.Done()
 			}()
 			handler.Handle(ctx, conn)
 		}()
 	}
+	// wait for all connections done
 	waitDone.Wait()
 }

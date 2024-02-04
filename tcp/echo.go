@@ -23,6 +23,7 @@ type EchoHandler struct {
 }
 
 // MakeEchoHandler creates EchoHandler
+
 func MakeHandler() *EchoHandler {
 	return &EchoHandler{}
 }
@@ -33,7 +34,7 @@ type EchoClient struct {
 	Waiting wait.Wait
 }
 
-// Close close connection
+// Close connection
 func (c *EchoClient) Close() error {
 	c.Waiting.WaitWithTimeout(10 * time.Second)
 	c.Conn.Close()
@@ -50,11 +51,13 @@ func (h *EchoHandler) Handle(ctx context.Context, conn net.Conn) {
 	client := &EchoClient{
 		Conn: conn,
 	}
+	//empty struct{} is used to mark the client is active
 	h.activeConn.Store(client, struct{}{})
 
 	reader := bufio.NewReader(conn)
 	for {
-		// may occurs: client EOF, client timeout, handler early close
+		// may occur: client EOF, client timeout, handler early close
+		// use \n to mark the end of message
 		msg, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
@@ -76,7 +79,9 @@ func (h *EchoHandler) Handle(ctx context.Context, conn net.Conn) {
 func (h *EchoHandler) Close() error {
 	logger.Info("handler shutting down...")
 	h.closing.Set(true)
+	//synchronously close all active connections,range is not concurrency safe
 	h.activeConn.Range(func(key interface{}, val interface{}) bool {
+		// get client value
 		client := key.(*EchoClient)
 		_ = client.Close()
 		return true
