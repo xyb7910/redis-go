@@ -47,6 +47,7 @@ func MakeHandler() *RespHandler {
 	}
 }
 
+// client closes client connection
 func (h *RespHandler) closeClient(client *connection.Connection) {
 	_ = client.Close()
 	h.db.AfterClientClose(client)
@@ -65,6 +66,7 @@ func (h *RespHandler) Handle(ctx context.Context, conn net.Conn) {
 
 	ch := parser.ParseStream(conn)
 	for payload := range ch {
+		// tcp lingering
 		if payload.Err != nil {
 			if payload.Err == io.EOF ||
 				payload.Err == io.ErrUnexpectedEOF ||
@@ -84,6 +86,7 @@ func (h *RespHandler) Handle(ctx context.Context, conn net.Conn) {
 			}
 			continue
 		}
+		//core logic handling
 		if payload.Data == nil {
 			logger.Error("empty payload")
 			continue

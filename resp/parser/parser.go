@@ -71,6 +71,7 @@ func parse0(reader io.Reader, ch chan<- *Payload) {
 		if !state.readingMultiLine {
 			// receive new response
 			if msg[0] == '*' {
+				//*n\r\n
 				// multi bulk reply
 				err = parseMultiBulkHeader(msg, &state)
 				if err != nil {
@@ -87,7 +88,9 @@ func parse0(reader io.Reader, ch chan<- *Payload) {
 					state = readState{} // reset state
 					continue
 				}
-			} else if msg[0] == '$' { // bulk reply
+			} else if msg[0] == '$' {
+				// $len\r\n
+				// bulk reply
 				err = parseBulkHeader(msg, &state)
 				if err != nil {
 					ch <- &Payload{
