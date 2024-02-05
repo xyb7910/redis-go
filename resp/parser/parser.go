@@ -141,7 +141,11 @@ func parse0(reader io.Reader, ch chan<- *Payload) {
 	}
 }
 
+// *$len\r\n$len\r\n
 func readLine(bufReader *bufio.Reader, state *readState) ([]byte, bool, error) {
+	// 1.the front of normal reply has \r\n, through \r\n separate lines
+	// 2.the front of bulk replay has $len,read $len bytes
+	// $len is a number, if $len is -1, it means null bulk reply
 	var msg []byte
 	var err error
 	if state.bulkLen == 0 { // read normal line
@@ -149,10 +153,13 @@ func readLine(bufReader *bufio.Reader, state *readState) ([]byte, bool, error) {
 		if err != nil {
 			return nil, true, err
 		}
+		// check if the last two bytes are \r
 		if len(msg) == 0 || msg[len(msg)-2] != '\r' {
 			return nil, false, errors.New("protocol error: " + string(msg))
 		}
-	} else { // read bulk line (binary safe)
+	} else {
+		// read bulk line (binary safe)
+		// the front of bulk replay has $len,read $len bytes
 		msg = make([]byte, state.bulkLen+2)
 		_, err = io.ReadFull(bufReader, msg)
 		if err != nil {
@@ -163,6 +170,7 @@ func readLine(bufReader *bufio.Reader, state *readState) ([]byte, bool, error) {
 			msg[len(msg)-1] != '\n' {
 			return nil, false, errors.New("protocol error: " + string(msg))
 		}
+		// reset state is zero
 		state.bulkLen = 0
 	}
 	return msg, false, nil
@@ -190,6 +198,7 @@ func parseMultiBulkHeader(msg []byte, state *readState) error {
 	}
 }
 
+// *$len\r\nP1\r\n$len\r\nP2\r\n...
 func parseBulkHeader(msg []byte, state *readState) error {
 	var err error
 	state.bulkLen, err = strconv.ParseInt(string(msg[1:len(msg)-2]), 10, 64)
@@ -209,6 +218,7 @@ func parseBulkHeader(msg []byte, state *readState) error {
 	}
 }
 
+// +OK -err
 func parseSingleLineReply(msg []byte) (resp.Reply, error) {
 	str := strings.TrimSuffix(string(msg), "\r\n")
 	var result resp.Reply
@@ -239,13 +249,15 @@ func parseSingleLineReply(msg []byte) (resp.Reply, error) {
 func readBody(msg []byte, state *readState) error {
 	line := msg[0 : len(msg)-2]
 	var err error
+	// $len
 	if line[0] == '$' {
 		// bulk reply
 		state.bulkLen, err = strconv.ParseInt(string(line[1:]), 10, 64)
 		if err != nil {
 			return errors.New("protocol error: " + string(msg))
 		}
-		if state.bulkLen <= 0 { // null bulk in multi bulks
+		if state.bulkLen <= 0 {
+			// null bulk in multi bulks
 			state.args = append(state.args, []byte{})
 			state.bulkLen = 0
 		}
