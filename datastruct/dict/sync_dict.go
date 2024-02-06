@@ -98,7 +98,6 @@ func (dict *SyncDict) RandomKeys(limit int) []string {
 		})
 	}
 	return result
-
 }
 
 // RandomDistinctKeys randomly returns keys of the given number, won't contain duplicated key

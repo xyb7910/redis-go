@@ -35,7 +35,7 @@ func makeDB() *DB {
 
 // Exec executes command within one database
 func (db *DB) Exec(c resp.Connection, cmdLine [][]byte) resp.Reply {
-
+	// check command kind,ping,set,get,del...
 	cmdName := strings.ToLower(string(cmdLine[0]))
 	cmd, ok := cmdTable[cmdName]
 	if !ok {
@@ -60,7 +60,6 @@ func validateArity(arity int, cmdArgs [][]byte) bool {
 
 // GetEntity returns DataEntity bind to given key
 func (db *DB) GetEntity(key string) (*database.DataEntity, bool) {
-
 	raw, ok := db.data.Get(key)
 	if !ok {
 		return nil, false
